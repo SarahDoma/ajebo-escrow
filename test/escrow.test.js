@@ -143,6 +143,25 @@ test('expired payout invoice blocks confirm before any money moves', async () =>
   assert.equal((await svc.confirm(buyerToken)).payoutStatus, 'paid');
 });
 
+test('demo backend: held escrow survives a restart', async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'ajebo-'));
+  const file = join(dir, 'escrows.json');
+  const boot = () => {
+    const ln = new MockLightning({ file: file + '.mock-ln.json' });
+    return { ln, svc: new EscrowService({ store: new Store(file), ln, payoutRetryDelayMs: 0 }) };
+  };
+  let { ln, svc } = boot();
+  const { buyerToken, sellerToken } = await svc.create({ title: 'x', amountSats: 20000 });
+  ln.simulatePayment(svc.authenticate(buyerToken).e.paymentHash);
+  await svc.setPayoutInvoice(sellerToken, PAYOUT);
+  ({ ln, svc } = boot()); // "restart": fresh objects reading the same files
+  assert.equal((await svc.get(buyerToken)).state, 'HELD');
+  assert.equal((await svc.confirm(buyerToken)).payoutStatus, 'paid');
+});
+
 test('input validation and secret hygiene', async () => {
   const { svc } = setup();
   await assert.rejects(svc.create({ title: '', amountSats: 20000 }), { status: 400 });

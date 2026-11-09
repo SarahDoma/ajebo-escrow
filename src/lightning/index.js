@@ -9,5 +9,5 @@ export function createLightning(env = process.env) {
       tlsCertPath: env.LND_TLS_CERT_PATH,
     });
   }
-  return new MockLightning();
+  return new MockLightning({ file: env.DATA_FILE ? `${env.DATA_FILE}.mock-ln.json` : undefined });
 }

@@ -8,17 +8,33 @@
  *   payInvoice(invoice, { maxFeeSats }) -> { ok, error? }
  *   decodeInvoice(invoice) -> { amountSats, expiresAt }   (throws if unreadable)
  */
+import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { sha256hex } from '../util.js';
 
 export class MockLightning {
-  constructor() {
+  /** @param {{ file?: string }} opts  file: persist invoice states so demo escrows survive restarts */
+  constructor({ file } = {}) {
     this.name = 'mock';
+    this.file = file || null;
     this.invoices = new Map(); // hash -> { state, amountSats }
     this.paid = []; // payouts made
     this.failPayouts = false; // test hook
+    if (this.file) {
+      try { this.invoices = new Map(Object.entries(JSON.parse(readFileSync(this.file, 'utf8')))); }
+      catch { /* first run */ }
+    }
+  }
+  #save() {
+    if (!this.file) return;
+    mkdirSync(dirname(this.file), { recursive: true });
+    const tmp = this.file + '.tmp';
+    writeFileSync(tmp, JSON.stringify(Object.fromEntries(this.invoices)), { mode: 0o600 });
+    renameSync(tmp, this.file);
   }
   async createHoldInvoice({ paymentHash, amountSats }) {
     this.invoices.set(paymentHash, { state: 'OPEN', amountSats });
+    this.#save();
     return { invoice: `lnbcrt${amountSats}mock${paymentHash.slice(0, 40)}` };
   }
   async lookup(paymentHash) {
@@ -28,10 +44,11 @@ export class MockLightning {
     const inv = this.invoices.get(sha256hex(preimageHex, 'hex'));
     if (!inv || inv.state !== 'ACCEPTED') throw new Error('cannot settle');
     inv.state = 'SETTLED';
+    this.#save();
   }
   async cancel(paymentHash) {
     const inv = this.invoices.get(paymentHash);
-    if (inv && inv.state !== 'SETTLED') inv.state = 'CANCELED';
+    if (inv && inv.state !== 'SETTLED') { inv.state = 'CANCELED'; this.#save(); }
   }
   async payInvoice(invoice) {
     if (this.failPayouts) return { ok: false, error: 'no route' };
@@ -52,7 +69,7 @@ export class MockLightning {
   /** Dev only: simulate the buyer's wallet paying (HTLC locked, not settled). */
   simulatePayment(paymentHash) {
     const inv = this.invoices.get(paymentHash);
-    if (inv && inv.state === 'OPEN') inv.state = 'ACCEPTED';
+    if (inv && inv.state === 'OPEN') { inv.state = 'ACCEPTED'; this.#save(); }
     return !!inv;
   }
 }
