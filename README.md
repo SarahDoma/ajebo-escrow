@@ -39,18 +39,35 @@ docker compose up --build # same thing in Docker
 The mock backend shows a **Dev: simulate payment** button on the buyer page so you can run the full flow with no wallet.
 
 ## Real Lightning (regtest/signet only while developing)
-1. Create an LND node in [Polar](https://lightningpolar.com/).
-2. Copy `.env.example` to `.env`, set `LN_BACKEND=lnd`, `LND_REST_URL`, `LND_MACAROON_HEX` (restricted macaroon: invoices and off-chain only).
-3. Set `NODE_EXTRA_CA_CERTS` to the node's `tls.cert`, then `npm start`.
+Tested against **LND 0.20.0** on a [Polar](https://lightningpolar.com/) regtest network.
 
-The LND adapter in `src/lightning/lnd.js` is a scaffold. It has not yet been run against a live node.
+1. In Polar, create a network with two LND nodes: `alice` (the app's node) and `bob` (the buyer's and seller's wallet). Fund both and open a channel each way, so alice can receive the buyer's payment and pay the seller.
+2. Bake a **least-privilege macaroon** on alice: invoices read/write and off-chain read/write only. It cannot touch on-chain funds; we checked that on-chain balance, new address and send-coins calls are all denied.
+   ```bash
+   lncli bakemacaroon invoices:read invoices:write offchain:read offchain:write info:read
+   ```
+3. Copy `.env.example` to `.env` and set `LN_BACKEND=lnd`, `LND_REST_URL` (alice's REST port), `LND_MACAROON_HEX` and `LND_TLS_CERT_PATH` (alice's `tls.cert`).
+4. Start the app against LND:
+   ```bash
+   npm run start:lnd
+   ```
+
+### End-to-end test on real Lightning
+[`scripts/e2e-lightning.mjs`](scripts/e2e-lightning.mjs) drives the app while bob pays real hold invoices. It checks:
+- **Happy path:** the buyer's sats are locked in flight, confirming delivery settles the invoice, and the seller is paid over Lightning.
+- **Refund path:** the seller refunds and the buyer gets every sat back.
+
+```bash
+APP_URL=http://localhost:3000 BOB_REST_URL=https://localhost:8082 BOB_MACAROON_HEX=<bob admin macaroon hex> NODE_EXTRA_CA_CERTS=<bob tls.cert> node scripts/e2e-lightning.mjs
+```
 
 ## Layout
 - `src/escrow.js`: state machine, auth, locking
 - `src/lightning/`: `mock.js` and `lnd.js` behind one small interface
 - `src/server.js`: HTTP API and static files (zero dependencies)
 - `public/`: server-rendered-style pages, about 4 KB of JS, no framework, works on mid-range phones
-- `test/`: node:test suite
+- `test/`: node:test suite (mock backend)
+- `scripts/e2e-lightning.mjs`: end-to-end test on a real regtest Lightning network
 
 ## Security
 See [SECURITY.md](SECURITY.md) for the threat model and known limits.
@@ -58,7 +75,9 @@ See [SECURITY.md](SECURITY.md) for the threat model and known limits.
 ## Status and next steps
 - [x] Escrow state machine with tests
 - [x] Mock Lightning backend and full UI flow
-- [ ] Verify the LND adapter on regtest
+- [x] LND adapter verified on regtest (hold invoice, settle, cancel, payout)
+- [x] Least-privilege macaroon (no on-chain access)
+- [ ] Deploy online and record the 3-minute demo
 - [ ] Decode payout invoices (amount and expiry check)
 - [ ] Nostr notifications to buyer and seller
 - [ ] Naira price display

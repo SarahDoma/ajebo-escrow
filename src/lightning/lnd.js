@@ -1,13 +1,13 @@
 /**
  * LND backend using the REST API (invoicesrpc hold invoices).
- * USE REGTEST / SIGNET WHILE DEVELOPING. Needs a macaroon baked with the
- * least privilege: invoices:read/write + offchain:write (no on-chain, no admin).
+ * USE REGTEST / SIGNET WHILE DEVELOPING. Give it a baked macaroon with least
+ * privilege: invoices:read/write + offchain:read/write (no on-chain, no admin).
+ * LND's self-signed TLS cert is pinned via tlsCertPath (LND_TLS_CERT_PATH).
  *
- * Status: scaffold. Endpoints follow LND's REST docs; verify against your LND version
- * (Polar makes a regtest node in two clicks).
+ * Tested against LND 0.20.0 on a Polar regtest network (scripts/e2e-lightning.mjs).
  */
 import { readFileSync } from 'node:fs';
-import { Agent } from 'node:https';
+import { request } from 'node:https';
 
 const b64 = (hex) => Buffer.from(hex, 'hex').toString('base64');
 const b64url = (hex) => b64(hex).replace(/\+/g, '-').replace(/\//g, '_');
@@ -16,21 +16,35 @@ export class LndLightning {
   constructor({ url, macaroonHex, tlsCertPath }) {
     if (!url || !macaroonHex) throw new Error('LND_REST_URL and LND_MACAROON_HEX are required');
     this.name = 'lnd';
-    this.url = url.replace(/\/$/, '');
+    this.url = new URL(url);
     this.macaroon = macaroonHex;
-    this.agent = tlsCertPath ? new Agent({ ca: readFileSync(tlsCertPath) }) : undefined;
+    // Trust only this node's cert (plus system CAs if none given, e.g. a hosted node).
+    this.ca = tlsCertPath ? readFileSync(tlsCertPath) : undefined;
   }
-  async #call(method, path, body) {
-    // Node's fetch ignores `agent`; undici dispatcher would be needed for self-signed certs.
-    // For regtest set NODE_EXTRA_CA_CERTS=<tls.cert> before starting the server.
-    const res = await fetch(this.url + path, {
-      method,
-      headers: { 'Grpc-Metadata-macaroon': this.macaroon, 'content-type': 'application/json' },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(15000),
+  #call(method, path, body) {
+    const data = body ? JSON.stringify(body) : undefined;
+    return new Promise((resolve, reject) => {
+      const req = request(new URL(path, this.url), {
+        method,
+        ca: this.ca,
+        timeout: 15000,
+        headers: {
+          'Grpc-Metadata-macaroon': this.macaroon,
+          'content-type': 'application/json',
+          ...(data && { 'content-length': Buffer.byteLength(data) }),
+        },
+      }, (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          if (res.statusCode < 200 || res.statusCode >= 300) return reject(new Error(`lnd ${path.split('?')[0]} -> ${res.statusCode}`));
+          try { resolve(JSON.parse(Buffer.concat(chunks).toString() || '{}')); } catch { reject(new Error(`lnd ${path} bad JSON`)); }
+        });
+      });
+      req.on('timeout', () => req.destroy(new Error(`lnd ${path.split('?')[0]} timed out`)));
+      req.on('error', reject);
+      req.end(data);
     });
-    if (!res.ok) throw new Error(`lnd ${path} -> ${res.status}`);
-    return res.json();
   }
   async createHoldInvoice({ paymentHash, amountSats, memo, expirySecs }) {
     const r = await this.#call('POST', '/v2/invoices/hodl', {

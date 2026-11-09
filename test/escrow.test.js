@@ -9,7 +9,7 @@ const PAYOUT = 'lnbcrt20000n1' + 'q'.repeat(60);
 function setup() {
   const ln = new MockLightning();
   let t = 1_000_000;
-  const svc = new EscrowService({ store: new Store(), ln, now: () => t });
+  const svc = new EscrowService({ store: new Store(), ln, now: () => t, payoutRetryDelayMs: 0 });
   return { svc, ln, advance: (ms) => { t += ms; } };
 }
 const make = (svc) => svc.create({ title: 'Ankara fabric', amountSats: 20000, ttlHours: 24 });
@@ -96,6 +96,19 @@ test('failed payout can be retried with a new invoice', async () => {
   ln.failPayouts = false;
   const retried = await svc.setPayoutInvoice(sellerToken, PAYOUT + 'x');
   assert.equal(retried.payoutStatus, 'paid');
+});
+
+test('transient payout failure is retried automatically', async () => {
+  const { svc, ln } = setup();
+  const { buyerToken, sellerToken } = await make(svc);
+  ln.simulatePayment(hashOf(svc, buyerToken));
+  await svc.setPayoutInvoice(sellerToken, PAYOUT);
+  let calls = 0;
+  const real = ln.payInvoice.bind(ln);
+  ln.payInvoice = async (inv) => (++calls === 1 ? { ok: false, error: 'temporary' } : real(inv));
+  assert.equal((await svc.confirm(buyerToken)).payoutStatus, 'paid');
+  assert.equal(calls, 2);
+  assert.deepEqual(ln.paid, [PAYOUT]);
 });
 
 test('input validation and secret hygiene', async () => {

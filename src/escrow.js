@@ -14,10 +14,11 @@ import { randomHex, sha256hex, safeEqual, HttpError } from './util.js';
 const INVOICE_RE = /^ln(bc|tb|bcrt|tbs)[0-9a-z]{20,2000}$/i;
 
 export class EscrowService {
-  constructor({ store, ln, now = () => Date.now(), limits = {} }) {
+  constructor({ store, ln, now = () => Date.now(), limits = {}, payoutRetryDelayMs = 1500 }) {
     this.store = store;
     this.ln = ln;
     this.now = now;
+    this.payoutRetryDelayMs = payoutRetryDelayMs;
     this.limits = { minSats: 1000, maxSats: 500_000, ...limits };
     this.locks = new Map();
   }
@@ -133,9 +134,21 @@ export class EscrowService {
     });
   }
 
+  /**
+   * Pay the seller. Retries briefly: right after settling, channel updates may still be
+   * in flight. Retrying the same invoice is safe because Lightning never pays a payment
+   * hash twice (LND rejects an already-paid invoice).
+   */
   async #payout(e) {
-    const r = await this.ln.payInvoice(e.payoutInvoice, { maxFeeSats: Math.max(10, Math.floor(e.amountSats * 0.01)) });
+    const maxFeeSats = Math.max(10, Math.floor(e.amountSats * 0.01));
+    let r;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) await new Promise((ok) => setTimeout(ok, this.payoutRetryDelayMs * attempt));
+      r = await this.ln.payInvoice(e.payoutInvoice, { maxFeeSats });
+      if (r.ok) break;
+    }
     e.payoutStatus = r.ok ? 'paid' : 'failed';
+    if (!r.ok) console.error(`payout failed for escrow ${e.id}: ${r.error}`); // no invoice or secrets logged
     this.store.put(e);
   }
 
