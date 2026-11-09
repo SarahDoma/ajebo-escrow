@@ -34,11 +34,11 @@ export class EscrowService {
 
   async create({ title, amountSats, ttlHours = 72 }) {
     title = String(title ?? '').trim();
-    if (title.length < 1 || title.length > 80) throw new HttpError(400, 'Title must be 1-80 characters');
+    if (title.length < 1 || title.length > 80) throw new HttpError(400, 'Describe the item in 1 to 80 characters');
     if (!Number.isInteger(amountSats) || amountSats < this.limits.minSats || amountSats > this.limits.maxSats)
       throw new HttpError(400, `Amount must be a whole number between ${this.limits.minSats} and ${this.limits.maxSats} sats`);
     if (!Number.isInteger(ttlHours) || ttlHours < 1 || ttlHours > 168)
-      throw new HttpError(400, 'Hold time must be 1-168 hours');
+      throw new HttpError(400, 'Choose between 1 hour and 7 days for the buyer to confirm');
 
     const id = randomHex(8);
     const preimage = randomHex(32);
@@ -105,21 +105,21 @@ export class EscrowService {
 
   async setPayoutInvoice(token, invoice) {
     const { e, role } = this.authenticate(token);
-    if (role !== 'seller') throw new HttpError(403, 'Only the seller can set the payout invoice');
+    if (role !== 'seller') throw new HttpError(403, 'Only the seller can add payment details');
     invoice = String(invoice ?? '').trim().replace(/^lightning:/i, '');
-    if (!INVOICE_RE.test(invoice)) throw new HttpError(400, 'That does not look like a Lightning invoice');
+    if (!INVOICE_RE.test(invoice)) throw new HttpError(400, 'That does not look like a Lightning payment request. Copy it again from your wallet.');
     let decoded;
     try { decoded = await this.ln.decodeInvoice(invoice); }
-    catch { throw new HttpError(400, 'Could not read that invoice. Check it is complete and for the right network.'); }
+    catch { throw new HttpError(400, 'Could not read that payment request. Check you copied all of it, and that your wallet is on the right network.'); }
     if (decoded.amountSats !== e.amountSats)
-      throw new HttpError(400, `The invoice must be for exactly ${e.amountSats.toLocaleString('en')} sats`);
+      throw new HttpError(400, `The payment request must be for exactly ${e.amountSats.toLocaleString('en')} sats`);
     if (decoded.expiresAt < this.now() + MIN_PAYOUT_VALIDITY_MS)
-      throw new HttpError(400, 'That invoice expires too soon. Create one that lasts longer (a day or more if your wallet allows).');
+      throw new HttpError(400, 'That payment request expires too soon. Create one that lasts longer (a day or more if your wallet allows).');
     return this.#lock(e.id, async () => {
       await this.#sync(e);
       const retry = e.state === 'SETTLED' && e.payoutStatus === 'failed';
       if (e.state !== 'AWAITING_PAYMENT' && e.state !== 'HELD' && !retry)
-        throw new HttpError(409, `Cannot set payout invoice while ${e.state}`);
+        throw new HttpError(409, 'This escrow is finished, so payment details can no longer be changed');
       e.payoutInvoice = invoice;
       e.payoutExpiresAt = decoded.expiresAt;
       this.store.put(e);
@@ -133,11 +133,11 @@ export class EscrowService {
     if (role !== 'buyer') throw new HttpError(403, 'Only the buyer can confirm delivery');
     return this.#lock(e.id, async () => {
       await this.#sync(e);
-      if (e.state !== 'HELD') throw new HttpError(409, `Cannot confirm while ${e.state}`);
+      if (e.state !== 'HELD') throw new HttpError(409, (e.state === 'AWAITING_PAYMENT' ? 'You need to pay before you can confirm delivery' : 'This escrow is already finished'));
       // Check before settling, so we never take the buyer's sats with nowhere valid to send them.
       if (!this.#payoutUsable(e)) throw new HttpError(409, e.payoutInvoice
-        ? "The seller's payout invoice has expired. They need to add a new one before you can confirm."
-        : 'Seller has not added a payout invoice yet');
+        ? "The seller's payment details have expired. They need to add new ones before you can confirm."
+        : 'The seller has not added their payment details yet');
       await this.ln.settle(e.preimage);
       e.state = 'SETTLED';
       e.payoutStatus = 'pending';
@@ -186,7 +186,7 @@ export class EscrowService {
         await this.ln.cancel(e.paymentHash);
         e.state = 'REFUNDED';
       } else {
-        throw new HttpError(409, `Cannot refund while ${e.state} as ${role}`);
+        throw new HttpError(409, (role === 'buyer' && e.state === 'HELD' ? 'Your money is locked. Only the seller can refund it, or it returns to you automatically if you do not confirm in time.' : 'This escrow is already finished'));
       }
       this.store.put(e);
       return this.view(e, role);

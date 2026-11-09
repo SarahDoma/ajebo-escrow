@@ -3,35 +3,96 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ajebo Escrow</title>
+  <meta name="description" content="Sell on Instagram and WhatsApp safely. The buyer's payment is locked until they receive the goods.">
+  <meta name="theme-color" content="#c2410c">
+  <title>Ajebo Escrow: safe payments for online sellers</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <main>
   <p id="banner" class="banner hidden" role="status"></p>
-  <h1>Ajebo Escrow</h1>
-  <p>Sell on Instagram or WhatsApp without asking buyers to trust you blindly. The buyer's sats stay locked until they say the goods arrived.</p>
+  <a class="top" href="/" aria-label="Ajebo Escrow home">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 4 7v8c0 7.4 5.1 13.6 12 15 6.9-1.4 12-7.6 12-15V7L16 2z" fill="#c2410c"/><path d="M17.5 7 10 18h5l-1.5 7L21 14h-5l1.5-7z" fill="#fff"/></svg>
+    <b>Ajebo Escrow</b>
+  </a>
 
-  <form id="create" class="card">
-    <label for="title">What are you selling?</label>
-    <input id="title" maxlength="80" required placeholder="Ankara fabric, 6 yards">
-    <label for="amount">Price in sats</label>
-    <input id="amount" type="number" inputmode="numeric" min="1000" step="1" required placeholder="20000">
-    <label for="ttl">Hold for (hours)</label>
-    <input id="ttl" type="number" inputmode="numeric" min="1" max="168" value="72">
-    <button type="submit">Create escrow</button>
-    <p id="err" class="bad" role="alert"></p>
-  </form>
+  <section id="start">
+    <h1>Sell online without the "who pays first?" fight</h1>
+    <p class="lead">Your buyer pays, but the money is <b>locked</b>. You get it the moment they confirm the goods arrived. If anything goes wrong, they get it back.</p>
 
-  <div id="done" class="card hidden">
-    <p><b>Send this link to your buyer:</b></p>
-    <code id="buyer"></code>
-    <a id="wa" class="button" href="#" target="_blank" rel="noopener noreferrer">Share on WhatsApp</a>
-    <button id="copybuyer" type="button" class="secondary">Copy buyer link</button>
-    <p><b>Keep this link private. It is your seller page. Bookmark it:</b></p>
-    <code id="seller"></code>
-    <a id="open" class="button secondary" href="#">Open seller page</a>
-  </div>
+    <form id="create" class="card" novalidate>
+      <h2>Create an escrow</h2>
+      <label for="title">What are you selling?</label>
+      <input id="title" maxlength="80" required autocomplete="off" placeholder="e.g. Ankara fabric, 6 yards">
+
+      <label for="amount">Price
+        <span class="hint">In sats: small units of bitcoin. 1,000 minimum.</span>
+      </label>
+      <div class="suffix">
+        <input id="amount" type="number" inputmode="numeric" min="1000" step="1" required placeholder="20,000">
+        <span>sats</span>
+      </div>
+
+      <label for="ttl">How long can the buyer take to confirm?
+        <span class="hint">If they don't confirm in time, they get their money back automatically.</span>
+      </label>
+      <select id="ttl">
+        <option value="24">1 day</option>
+        <option value="72" selected>3 days</option>
+        <option value="168">7 days</option>
+      </select>
+
+      <button id="createbtn" type="submit">Create escrow</button>
+      <p id="err" class="err" role="alert"></p>
+    </form>
+
+    <section class="card" aria-labelledby="how">
+      <h2 id="how">How it works</h2>
+      <ol class="steps">
+        <li><b>You create an escrow</b>and send the buyer link on WhatsApp or Instagram.</li>
+        <li><b>The buyer pays with Lightning</b>The money is locked. Nobody can touch it, not even us.</li>
+        <li><b>You ship the goods</b>and add where you want to be paid.</li>
+        <li><b>The buyer confirms delivery</b>and you are paid in seconds.</li>
+      </ol>
+      <ul class="trust">
+        <li>No account or sign-up needed</li>
+        <li>Automatic refund if the buyer doesn't confirm in time</li>
+        <li>Works on any phone with a Lightning wallet</li>
+      </ul>
+    </section>
+  </section>
+
+  <section id="done" class="hidden" aria-live="polite">
+    <div class="card">
+      <div class="success-mark" aria-hidden="true">✓</div>
+      <h1 id="done-title">Escrow created</h1>
+      <p id="done-sub"></p>
+    </div>
+
+    <div class="card">
+      <h2>1. Send this link to your buyer</h2>
+      <div id="buyer" class="linkbox"></div>
+      <a id="wa" class="button" href="#" target="_blank" rel="noopener noreferrer">Share on WhatsApp</a>
+      <button id="copybuyer" type="button" class="secondary">Copy buyer link</button>
+    </div>
+
+    <div class="card">
+      <h2>2. Save your seller link</h2>
+      <p>You'll use it to add where you want to be paid and to follow the sale.</p>
+      <div id="seller" class="linkbox"></div>
+      <p class="notice warn">Keep this link private. Anyone who has it can manage this escrow. Bookmark it or save it in your notes.</p>
+      <div class="row">
+        <button id="copyseller" type="button" class="secondary">Copy</button>
+        <a id="open" class="button" href="#">Open seller page</a>
+      </div>
+    </div>
+    <a class="button secondary" href="/">Create another escrow</a>
+  </section>
+
+  <footer>
+    Open source · <a href="https://github.com/SarahDoma/ajebo-escrow" rel="noopener">GitHub</a>
+  </footer>
   <script src="/app.js" type="module"></script>
 </main>
 </body>

@@ -3,42 +3,62 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#c2410c">
+  <meta name="robots" content="noindex">
   <title>Escrow</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <main>
   <p id="banner" class="banner hidden" role="status"></p>
-  <p class="role" id="role"></p>
-  <h1 id="title">Loading...</h1>
-  <div class="card">
-    <div class="amount"><span id="amount"></span> sats</div>
-    <div class="state" id="state"></div>
+  <a class="top" href="/" aria-label="Ajebo Escrow home">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 4 7v8c0 7.4 5.1 13.6 12 15 6.9-1.4 12-7.6 12-15V7L16 2z" fill="#c2410c"/><path d="M17.5 7 10 18h5l-1.5 7L21 14h-5l1.5-7z" fill="#fff"/></svg>
+    <b>Ajebo Escrow</b>
+  </a>
+
+  <section class="card" aria-live="polite">
+    <span class="pill" id="role">Loading…</span>
+    <h1 id="title"></h1>
+    <div class="amount"><span id="amount">–</span> <small>sats</small></div>
+    <div class="status" id="state"></div>
     <p id="help"></p>
     <p class="small" id="expires"></p>
-  </div>
+    <ol class="track" id="track" aria-label="Progress">
+      <li>Created</li><li>Paid &amp; locked</li><li>Delivered</li><li>Seller paid</li>
+    </ol>
+  </section>
 
-  <div id="pay" class="card hidden">
-    <p><b>Pay from your Lightning wallet.</b> Your sats stay locked until you confirm the goods arrived.</p>
-    <a id="openwallet" class="button" href="#">Open in wallet</a>
-    <code id="invoice"></code>
-    <button id="copy" type="button" class="secondary">Copy invoice</button>
-    <button id="devpay" type="button" class="secondary hidden">Dev: simulate payment</button>
-  </div>
+  <!-- Buyer: pay -->
+  <section id="pay" class="card hidden">
+    <h2>Pay with your Lightning wallet</h2>
+    <p>Your money stays <b>locked</b> until you confirm the goods arrived. If you don't confirm in time, it comes back to you.</p>
+    <a id="openwallet" class="button" href="#">Open in my wallet</a>
+    <button id="copy" type="button" class="secondary">Copy payment request</button>
+    <div id="invoice" class="invoice" title="Lightning payment request"></div>
+    <button id="devpay" type="button" class="secondary hidden">Demo: simulate payment</button>
+  </section>
 
-  <div id="payout" class="card hidden">
-    <p id="payexpired" class="bad hidden">Your previous payout invoice expired. Please add a new one.</p>
-    <label for="payinv">Where should we pay you? Create an invoice for exactly <b id="payamt"></b> sats in your Lightning wallet and paste it here. If your wallet lets you, make it last a few days.</label>
-    <textarea id="payinv" rows="3" autocomplete="off" spellcheck="false"></textarea>
-    <button id="savepay" type="button">Save payout invoice</button>
-    <button id="demofill" type="button" class="secondary hidden">Demo: use a test invoice</button>
-  </div>
-  <p id="paysaved" class="ok hidden">Payout invoice saved. You will be paid when the buyer confirms.</p>
+  <!-- Seller: where to pay -->
+  <section id="payout" class="card hidden">
+    <h2>Where should we pay you?</h2>
+    <p id="payexpired" class="notice bad hidden">Your last payment request expired. Please add a new one.</p>
+    <p>In your Lightning wallet, tap <b>Receive</b>, request exactly <b id="payamt"></b> sats, and paste it here. If your wallet lets you, make it last a few days.</p>
+    <label for="payinv">Your payment request</label>
+    <textarea id="payinv" rows="3" autocomplete="off" spellcheck="false" placeholder="lnbc…"></textarea>
+    <button id="savepay" type="button">Save</button>
+    <button id="demofill" type="button" class="secondary hidden">Demo: use a test request</button>
+  </section>
+  <p id="paysaved" class="notice ok hidden">✓ Payment details saved. You'll be paid as soon as the buyer confirms.</p>
 
-  <p id="waitseller" class="small hidden">Waiting for the seller to add their payout details. You can confirm after that.</p>
+  <p id="waitseller" class="notice warn hidden">Waiting for the seller to add their payment details. You can confirm delivery after that.</p>
   <button id="confirm" type="button" class="hidden">I received the goods: release payment</button>
-  <button id="refund" type="button" class="secondary hidden">Refund buyer</button>
-  <p id="err" class="bad" role="alert"></p>
+  <button id="refund" type="button" class="danger hidden">Refund buyer</button>
+  <p id="err" class="err" role="alert"></p>
+
+  <footer>
+    <span id="live">Updates automatically</span> · <a href="/">New escrow</a>
+  </footer>
   <script src="/escrow.js" type="module"></script>
 </main>
 </body>
