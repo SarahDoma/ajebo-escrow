@@ -65,6 +65,14 @@ export class LndLightning {
   async cancel(paymentHash) {
     await this.#call('POST', '/v2/invoices/cancel', { payment_hash: b64(paymentHash) });
   }
+  async decodeInvoice(invoice) {
+    // Fails for invoices from another network (e.g. mainnet invoice on a signet node).
+    const r = await this.#call('GET', `/v1/payreq/${encodeURIComponent(invoice)}`);
+    return {
+      amountSats: Number(r.num_satoshis),
+      expiresAt: (Number(r.timestamp) + Number(r.expiry || 3600)) * 1000,
+    };
+  }
   async payInvoice(invoice, { maxFeeSats = 50 } = {}) {
     try {
       const r = await this.#call('POST', '/v1/channels/transactions', {

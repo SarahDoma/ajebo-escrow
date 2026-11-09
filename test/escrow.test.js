@@ -4,7 +4,7 @@ import { EscrowService } from '../src/escrow.js';
 import { Store } from '../src/store.js';
 import { MockLightning } from '../src/lightning/mock.js';
 
-const PAYOUT = 'lnbcrt20000n1' + 'q'.repeat(60);
+const PAYOUT = 'lnbcrt200u1' + 'q'.repeat(60); // 200 micro-BTC = 20,000 sats
 
 function setup() {
   const ln = new MockLightning();
@@ -109,6 +109,38 @@ test('transient payout failure is retried automatically', async () => {
   assert.equal((await svc.confirm(buyerToken)).payoutStatus, 'paid');
   assert.equal(calls, 2);
   assert.deepEqual(ln.paid, [PAYOUT]);
+});
+
+test('payout invoice must be for the exact escrow amount', async () => {
+  const { svc } = setup();
+  const { sellerToken } = await make(svc);
+  await assert.rejects(svc.setPayoutInvoice(sellerToken, 'lnbcrt100u1' + 'q'.repeat(60)), { status: 400, message: /exactly 20,000 sats/ });
+  await assert.rejects(svc.setPayoutInvoice(sellerToken, 'lnbcrt1' + 'q'.repeat(60)), { status: 400, message: /Could not read/ });
+});
+
+test('payout invoice that expires too soon is rejected', async () => {
+  const { svc, ln } = setup();
+  const { sellerToken } = await make(svc);
+  ln.decodeExpiresAt = 1_000_000 + 5 * 60_000; // 5 minutes from "now"
+  await assert.rejects(svc.setPayoutInvoice(sellerToken, PAYOUT), { status: 400, message: /expires too soon/ });
+});
+
+test('expired payout invoice blocks confirm before any money moves', async () => {
+  const { svc, ln, advance } = setup();
+  const { buyerToken, sellerToken } = await make(svc);
+  const hash = hashOf(svc, buyerToken);
+  ln.simulatePayment(hash);
+  ln.decodeExpiresAt = 1_000_000 + 60 * 60_000; // valid for 1 hour
+  await svc.setPayoutInvoice(sellerToken, PAYOUT);
+  advance(2 * 60 * 60_000); // 2 hours later, still inside the 24h escrow
+  const seller = await svc.get(sellerToken);
+  assert.equal(seller.hasPayoutInvoice, false);
+  assert.equal(seller.payoutExpired, true);
+  await assert.rejects(svc.confirm(buyerToken), { status: 409, message: /expired/ });
+  assert.equal(await ln.lookup(hash), 'ACCEPTED'); // buyer's sats still locked, not taken
+  ln.decodeExpiresAt = undefined;
+  await svc.setPayoutInvoice(sellerToken, PAYOUT);
+  assert.equal((await svc.confirm(buyerToken)).payoutStatus, 'paid');
 });
 
 test('input validation and secret hygiene', async () => {

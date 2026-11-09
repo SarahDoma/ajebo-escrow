@@ -12,6 +12,7 @@
 import { randomHex, sha256hex, safeEqual, HttpError } from './util.js';
 
 const INVOICE_RE = /^ln(bc|tb|bcrt|tbs)[0-9a-z]{20,2000}$/i;
+const MIN_PAYOUT_VALIDITY_MS = 10 * 60 * 1000; // reject payout invoices expiring within 10 minutes
 
 export class EscrowService {
   constructor({ store, ln, now = () => Date.now(), limits = {}, payoutRetryDelayMs = 1500 }) {
@@ -75,7 +76,8 @@ export class EscrowService {
     const v = {
       id: e.id, title: e.title, amountSats: e.amountSats, state: e.state, role,
       expiresAt: e.expiresAt, createdAt: e.createdAt, payoutStatus: e.payoutStatus,
-      hasPayoutInvoice: !!e.payoutInvoice,
+      hasPayoutInvoice: this.#payoutUsable(e),
+      payoutExpired: !!e.payoutInvoice && !this.#payoutUsable(e),
     };
     if (role === 'buyer' && e.state === 'AWAITING_PAYMENT') v.invoice = e.invoice;
     return v;
@@ -106,12 +108,20 @@ export class EscrowService {
     if (role !== 'seller') throw new HttpError(403, 'Only the seller can set the payout invoice');
     invoice = String(invoice ?? '').trim().replace(/^lightning:/i, '');
     if (!INVOICE_RE.test(invoice)) throw new HttpError(400, 'That does not look like a Lightning invoice');
+    let decoded;
+    try { decoded = await this.ln.decodeInvoice(invoice); }
+    catch { throw new HttpError(400, 'Could not read that invoice. Check it is complete and for the right network.'); }
+    if (decoded.amountSats !== e.amountSats)
+      throw new HttpError(400, `The invoice must be for exactly ${e.amountSats.toLocaleString('en')} sats`);
+    if (decoded.expiresAt < this.now() + MIN_PAYOUT_VALIDITY_MS)
+      throw new HttpError(400, 'That invoice expires too soon. Create one that lasts longer (a day or more if your wallet allows).');
     return this.#lock(e.id, async () => {
       await this.#sync(e);
       const retry = e.state === 'SETTLED' && e.payoutStatus === 'failed';
       if (e.state !== 'AWAITING_PAYMENT' && e.state !== 'HELD' && !retry)
         throw new HttpError(409, `Cannot set payout invoice while ${e.state}`);
       e.payoutInvoice = invoice;
+      e.payoutExpiresAt = decoded.expiresAt;
       this.store.put(e);
       if (retry) await this.#payout(e);
       return this.view(e, role);
@@ -124,7 +134,10 @@ export class EscrowService {
     return this.#lock(e.id, async () => {
       await this.#sync(e);
       if (e.state !== 'HELD') throw new HttpError(409, `Cannot confirm while ${e.state}`);
-      if (!e.payoutInvoice) throw new HttpError(409, 'Seller has not added a payout invoice yet');
+      // Check before settling, so we never take the buyer's sats with nowhere valid to send them.
+      if (!this.#payoutUsable(e)) throw new HttpError(409, e.payoutInvoice
+        ? "The seller's payout invoice has expired. They need to add a new one before you can confirm."
+        : 'Seller has not added a payout invoice yet');
       await this.ln.settle(e.preimage);
       e.state = 'SETTLED';
       e.payoutStatus = 'pending';
@@ -139,7 +152,16 @@ export class EscrowService {
    * in flight. Retrying the same invoice is safe because Lightning never pays a payment
    * hash twice (LND rejects an already-paid invoice).
    */
+  #payoutUsable(e) {
+    return !!e.payoutInvoice && (e.payoutExpiresAt == null || this.now() < e.payoutExpiresAt);
+  }
+
   async #payout(e) {
+    if (!this.#payoutUsable(e)) {
+      e.payoutStatus = 'failed';
+      console.error(`payout skipped for escrow ${e.id}: payout invoice expired`);
+      return this.store.put(e);
+    }
     const maxFeeSats = Math.max(10, Math.floor(e.amountSats * 0.01));
     let r;
     for (let attempt = 0; attempt < 3; attempt++) {

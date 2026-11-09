@@ -8,6 +8,7 @@
 </head>
 <body>
 <main>
+  <p id="banner" class="banner hidden" role="status"></p>
   <p class="role" id="role"></p>
   <h1 id="title">Loading...</h1>
   <div class="card">
@@ -26,9 +27,11 @@
   </div>
 
   <div id="payout" class="card hidden">
-    <label for="payinv">Where should we pay you? Create an invoice for <b id="payamt"></b> sats in your Lightning wallet and paste it here.</label>
+    <p id="payexpired" class="bad hidden">Your previous payout invoice expired. Please add a new one.</p>
+    <label for="payinv">Where should we pay you? Create an invoice for exactly <b id="payamt"></b> sats in your Lightning wallet and paste it here. If your wallet lets you, make it last a few days.</label>
     <textarea id="payinv" rows="3" autocomplete="off" spellcheck="false"></textarea>
     <button id="savepay" type="button">Save payout invoice</button>
+    <button id="demofill" type="button" class="secondary hidden">Demo: use a test invoice</button>
   </div>
   <p id="paysaved" class="ok hidden">Payout invoice saved. You will be paid when the buyer confirms.</p>
 

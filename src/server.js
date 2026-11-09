@@ -15,6 +15,13 @@ export function buildServer({ env = process.env, ln = createLightning(env), stor
     store, ln,
     limits: { minSats: +env.MIN_SATS || 1000, maxSats: +env.MAX_SATS || 500_000 },
   });
+  const network = ln.name === 'mock' ? 'demo' : (env.LN_NETWORK || 'regtest');
+  const trustProxy = env.TRUST_PROXY === '1';
+  // Behind a proxy (Fly.io, Railway) every request comes from the proxy, so use the
+  // client IP header it sets. Only trust it when TRUST_PROXY=1, since clients can forge it.
+  const clientIp = (req) => (trustProxy
+    && (req.headers['fly-client-ip'] || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()))
+    || req.socket.remoteAddress;
   const hits = new Map(); // naive per-IP rate limit
   const limited = (ip) => {
     const k = ip + Math.floor(Date.now() / 60000);
@@ -28,6 +35,7 @@ export function buildServer({ env = process.env, ln = createLightning(env), stor
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'no-referrer', // tokens live in URLs: never leak them
     'cache-control': 'no-store',
+    ...(trustProxy && { 'strict-transport-security': 'max-age=31536000' }), // proxy terminates HTTPS
   };
   const json = (res, status, body) => {
     res.writeHead(status, { ...headers, 'content-type': 'application/json' });
@@ -43,7 +51,8 @@ export function buildServer({ env = process.env, ln = createLightning(env), stor
   const server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://x');
-      if (limited(req.socket.remoteAddress)) throw new HttpError(429, 'Slow down');
+      if (url.pathname === '/healthz') return json(res, 200, { ok: true });
+      if (limited(clientIp(req))) throw new HttpError(429, 'Too many requests. Wait a minute and try again.');
 
       if (url.pathname.startsWith('/api/')) {
         const p = url.pathname;
@@ -52,7 +61,7 @@ export function buildServer({ env = process.env, ln = createLightning(env), stor
           const b = await readBody(req);
           return json(res, 201, await svc.create({ title: b.title, amountSats: b.amountSats, ttlHours: b.ttlHours ?? 72 }));
         }
-        if (req.method === 'GET' && p === '/api/config') return json(res, 200, { mock: ln.name === 'mock' });
+        if (req.method === 'GET' && p === '/api/config') return json(res, 200, { mock: ln.name === 'mock', network });
         if (req.method === 'GET' && p === '/api/escrow') return json(res, 200, await svc.get(bearer(req)));
         if (post && p === '/api/escrow/payout') return json(res, 200, await svc.setPayoutInvoice(bearer(req), (await readBody(req)).invoice));
         if (post && p === '/api/escrow/confirm') return json(res, 200, await svc.confirm(bearer(req)));
@@ -86,7 +95,12 @@ export function buildServer({ env = process.env, ln = createLightning(env), stor
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  // Refuse to run against mainnet unless explicitly allowed: this is hackathon software.
+  if (process.env.LN_NETWORK === 'mainnet' && process.env.ALLOW_MAINNET !== '1') {
+    console.error('Refusing to start on mainnet without ALLOW_MAINNET=1');
+    process.exit(1);
+  }
   const port = +process.env.PORT || 3000;
   const { ln, server } = buildServer();
-  server.listen(port, () => console.log(`Ajebo Escrow on http://localhost:${port} (lightning: ${ln.name})`));
+  server.listen(port, () => console.log(`Ajebo Escrow on port ${port} (lightning: ${ln.name}, network: ${process.env.LN_NETWORK || (ln.name === 'mock' ? 'demo' : 'regtest')})`));
 }

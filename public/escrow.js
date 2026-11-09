@@ -1,3 +1,5 @@
+import { config } from './banner.js';
+
 const $ = (id) => document.getElementById(id);
 const token = location.pathname.split('/')[2];
 const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
@@ -47,6 +49,8 @@ function render(e) {
   const retry = e.state === 'SETTLED' && e.payoutStatus === 'failed';
   show('payout', seller && ((open && !e.hasPayoutInvoice) || retry));
   show('paysaved', seller && open && e.hasPayoutInvoice);
+  show('payexpired', seller && e.payoutExpired);
+  amountSats = e.amountSats;
   show('confirm', buyer && e.state === 'HELD' && e.hasPayoutInvoice);
   show('waitseller', buyer && e.state === 'HELD' && !e.hasPayoutInvoice);
   show('refund', (seller && open) || (buyer && e.state === 'AWAITING_PAYMENT'));
@@ -70,7 +74,13 @@ $('refund').onclick = () => {
 };
 $('devpay').onclick = () => call('/api/dev/pay', 'POST').then(refresh).catch(() => {});
 
-// Dev button only exists with the mock backend.
-fetch('/api/config').then((r) => r.json()).then((c) => { if (c.mock) show('devpay', true); }).catch(() => {});
+// Demo helpers only exist with the mock backend: there is no real wallet to pay or invoice from.
+let amountSats = 0;
+$('demofill').onclick = () => {
+  // A BOLT11-shaped placeholder for the right amount (n = 0.1 sat units). Only the mock accepts it.
+  const tail = Array.from(crypto.getRandomValues(new Uint8Array(40)), (b) => 'qpzry9x8gf2tvdw0s3jn54khce6mua7l'[b % 32]).join('');
+  $('payinv').value = `lnbcrt${amountSats * 10}n1${tail}`;
+};
+config.then((c) => { if (c.mock) { show('devpay', true); show('demofill', true); } });
 refresh();
 setInterval(refresh, 8000);

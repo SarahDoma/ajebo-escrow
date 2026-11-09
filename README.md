@@ -2,6 +2,8 @@
 
 **Lightning escrow for social-media sellers.** A buyer pays into a hold invoice, and the sats stay locked until the buyer confirms delivery. Built for the Dakar Bitcoin Hack by Btrust.
 
+**Live demo:** _coming soon_ (test network only, no real money). To deploy your own, see [DEPLOY.md](DEPLOY.md).
+
 ## The problem
 Millions of Nigerian and African merchants sell on Instagram and WhatsApp. Buyers fear paying first and being scammed. Sellers lose sales because buyers won't pay first. Cards and bank transfers offer no neutral middle.
 
@@ -36,7 +38,7 @@ npm start                 # http://localhost:3000, mock Lightning backend
 npm test                  # state machine, auth and race tests
 docker compose up --build # same thing in Docker
 ```
-The mock backend shows a **Dev: simulate payment** button on the buyer page so you can run the full flow with no wallet.
+In demo mode a banner says payments are simulated. The buyer page has a **Dev: simulate payment** button, and the seller page has **Demo: use a test invoice**, so you can run the full flow with no wallet.
 
 ## Real Lightning (regtest/signet only while developing)
 Tested against **LND 0.20.0** on a [Polar](https://lightningpolar.com/) regtest network.
@@ -78,7 +80,8 @@ See [SECURITY.md](SECURITY.md) for the threat model and known limits.
 - [x] LND adapter verified on regtest (hold invoice, settle, cancel, payout)
 - [x] Least-privilege macaroon (no on-chain access)
 - [ ] Deploy online and record the 3-minute demo
-- [ ] Decode payout invoices (amount and expiry check)
+- [x] Decode payout invoices: exact amount, expiry, network; confirm is blocked if the seller's invoice expired
+- [x] Deploy config: Fly.io with a persistent volume, health check, test-network banner, mainnet guard
 - [ ] Nostr notifications to buyer and seller
 - [ ] Naira price display
 - [ ] Arbiter for disputes

@@ -1,0 +1,38 @@
+# Fly.io deploy config. First time: see DEPLOY.md.
+# The app name must be unique on Fly; change it if "ajebo-escrow" is taken.
+app = "ajebo-escrow"
+primary_region = "lhr" # London: usually the lowest latency from Lagos. Pick another if you prefer.
+
+[build]
+
+[env]
+  PORT = "3000"
+  DATA_FILE = "/data/escrows.json"
+  TRUST_PROXY = "1"
+  # Demo mode by default. For a real test-network node set LN_BACKEND=lnd and
+  # LN_NETWORK=signet here, and the LND_* values as secrets (see DEPLOY.md).
+  LN_BACKEND = "mock"
+
+# Escrow data (including the secrets that release held payments) lives on this volume.
+[mounts]
+  source = "escrow_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Keep one machine running: the background sweep refunds expired escrows.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

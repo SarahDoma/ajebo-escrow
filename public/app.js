@@ -1,3 +1,5 @@
+import './banner.js';
+
 const $ = (id) => document.getElementById(id);
 
 $('create').addEventListener('submit', async (ev) => {
