@@ -8,26 +8,31 @@
 </head>
 <body>
 <main>
+  <p class="role" id="role"></p>
   <h1 id="title">Loading...</h1>
   <div class="card">
-    <div><span id="amount"></span> sats</div>
+    <div class="amount"><span id="amount"></span> sats</div>
     <div class="state" id="state"></div>
     <p id="help"></p>
+    <p class="small" id="expires"></p>
   </div>
 
   <div id="pay" class="card hidden">
-    <p><b>Pay this Lightning invoice from your wallet:</b></p>
+    <p><b>Pay from your Lightning wallet.</b> Your sats stay locked until you confirm the goods arrived.</p>
+    <a id="openwallet" class="button" href="#">Open in wallet</a>
     <code id="invoice"></code>
     <button id="copy" type="button" class="secondary">Copy invoice</button>
     <button id="devpay" type="button" class="secondary hidden">Dev: simulate payment</button>
   </div>
 
   <div id="payout" class="card hidden">
-    <label for="payinv">Your payout invoice (create it in your Lightning wallet for this amount)</label>
+    <label for="payinv">Where should we pay you? Create an invoice for <b id="payamt"></b> sats in your Lightning wallet and paste it here.</label>
     <textarea id="payinv" rows="3" autocomplete="off" spellcheck="false"></textarea>
     <button id="savepay" type="button">Save payout invoice</button>
   </div>
+  <p id="paysaved" class="ok hidden">Payout invoice saved. You will be paid when the buyer confirms.</p>
 
+  <p id="waitseller" class="small hidden">Waiting for the seller to add their payout details. You can confirm after that.</p>
   <button id="confirm" type="button" class="hidden">I received the goods: release payment</button>
   <button id="refund" type="button" class="secondary hidden">Refund buyer</button>
   <p id="err" class="bad" role="alert"></p>
