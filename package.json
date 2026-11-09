@@ -1,0 +1,13 @@
+{
+  "name": "ajebo-escrow",
+  "version": "0.1.0",
+  "description": "Lightning hold-invoice escrow for social-media sellers in Africa",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test \"test/*.test.js\""
+  }
+}

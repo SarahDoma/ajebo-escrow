@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ajebo Escrow</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <h1>Ajebo Escrow</h1>
+  <p>Sell on Instagram or WhatsApp without asking buyers to trust you blindly. The buyer's sats stay locked until they say the goods arrived.</p>
+
+  <form id="create" class="card">
+    <label for="title">What are you selling?</label>
+    <input id="title" maxlength="80" required placeholder="Ankara fabric, 6 yards">
+    <label for="amount">Price in sats</label>
+    <input id="amount" type="number" inputmode="numeric" min="1000" step="1" required placeholder="20000">
+    <label for="ttl">Hold for (hours)</label>
+    <input id="ttl" type="number" inputmode="numeric" min="1" max="168" value="72">
+    <button type="submit">Create escrow</button>
+    <p id="err" class="bad" role="alert"></p>
+  </form>
+
+  <div id="done" class="card hidden">
+    <p><b>Send this link to your buyer:</b></p>
+    <code id="buyer"></code>
+    <p><b>Keep this link private. It is your seller page:</b></p>
+    <code id="seller"></code>
+    <a id="open" href="#"><button type="button" class="secondary">Open seller page</button></a>
+  </div>
+  <script src="/app.js" type="module"></script>
+</main>
+</body>
+</html>

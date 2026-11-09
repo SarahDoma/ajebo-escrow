@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Escrow</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <h1 id="title">Loading...</h1>
+  <div class="card">
+    <div><span id="amount"></span> sats</div>
+    <div class="state" id="state"></div>
+    <p id="help"></p>
+  </div>
+
+  <div id="pay" class="card hidden">
+    <p><b>Pay this Lightning invoice from your wallet:</b></p>
+    <code id="invoice"></code>
+    <button id="copy" type="button" class="secondary">Copy invoice</button>
+    <button id="devpay" type="button" class="secondary hidden">Dev: simulate payment</button>
+  </div>
+
+  <div id="payout" class="card hidden">
+    <label for="payinv">Your payout invoice (create it in your Lightning wallet for this amount)</label>
+    <textarea id="payinv" rows="3" autocomplete="off" spellcheck="false"></textarea>
+    <button id="savepay" type="button">Save payout invoice</button>
+  </div>
+
+  <button id="confirm" type="button" class="hidden">I received the goods: release payment</button>
+  <button id="refund" type="button" class="secondary hidden">Refund buyer</button>
+  <p id="err" class="bad" role="alert"></p>
+  <script src="/escrow.js" type="module"></script>
+</main>
+</body>
+</html>

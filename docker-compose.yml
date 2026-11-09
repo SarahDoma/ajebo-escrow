@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports: ["3000:3000"]
+    environment:
+      LN_BACKEND: ${LN_BACKEND:-mock}
+      LND_REST_URL: ${LND_REST_URL:-}
+      LND_MACAROON_HEX: ${LND_MACAROON_HEX:-}
+      DATA_FILE: /data/escrows.json
+    volumes:
+      - escrow-data:/data
+volumes:
+  escrow-data:
