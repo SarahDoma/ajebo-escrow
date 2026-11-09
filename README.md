@@ -2,7 +2,7 @@
 
 **Lightning escrow for social-media sellers.** A buyer pays into a hold invoice, and the sats stay locked until the buyer confirms delivery. Built for the Dakar Bitcoin Hack by Btrust.
 
-**Live demo:** _coming soon_ (test network only, no real money). To deploy your own, see [DEPLOY.md](DEPLOY.md).
+**Live demo: https://ajebo-escrow.fly.dev** (demo mode: payments are simulated, no real money). Create an escrow, open the buyer link, tap *Dev: simulate payment*, then on the seller page tap *Demo: use a test invoice*, and confirm as the buyer. Real Lightning is shown in the demo video and in [`scripts/e2e-lightning.mjs`](scripts/e2e-lightning.mjs). To deploy your own, see [DEPLOY.md](DEPLOY.md).
 
 ## The problem
 Millions of Nigerian and African merchants sell on Instagram and WhatsApp. Buyers fear paying first and being scammed. Sellers lose sales because buyers won't pay first. Cards and bank transfers offer no neutral middle.
@@ -79,7 +79,8 @@ See [SECURITY.md](SECURITY.md) for the threat model and known limits.
 - [x] Mock Lightning backend and full UI flow
 - [x] LND adapter verified on regtest (hold invoice, settle, cancel, payout)
 - [x] Least-privilege macaroon (no on-chain access)
-- [ ] Deploy online and record the 3-minute demo
+- [x] Deployed on Fly.io with a persistent volume (verified: held escrows survive a restart)
+- [ ] Record the 3-minute demo
 - [x] Decode payout invoices: exact amount, expiry, network; confirm is blocked if the seller's invoice expired
 - [x] Deploy config: Fly.io with a persistent volume, health check, test-network banner, mainnet guard
 - [ ] Nostr notifications to buyer and seller
